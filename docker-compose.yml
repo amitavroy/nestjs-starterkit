@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:18.4-alpine
+    container_name: nestjs-sk-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nestjs-sk}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - nestjs-sk_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-nestjs-sk}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nestjs-sk
+
+  db-admin:
+    image: adminer:5.4.2
+    container_name: nestjs-sk-db-admin
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+      ADMINER_DEFAULT_DB_DRIVER: pgsql
+    ports:
+      - '${ADMINER_PORT:-8080}:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nestjs-sk
+
+  redis:
+    image: redis:8.8.0-alpine
+    container_name: nestjs-sk-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - nestjs-sk_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nestjs-sk
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: nestjs-sk-dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - '${DOZZLE_PORT:-9999}:8080'
+    networks:
+      - nestjs-sk
+
+networks:
+  nestjs-sk:
+    name: nestjs-sk
+
+volumes:
+  nestjs-sk_db_data:
+    name: nestjs-sk_db_data
+  nestjs-sk_redis_data:
+    name: nestjs-sk_redis_data
