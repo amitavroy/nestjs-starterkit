@@ -1,26 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { QueueProducerService } from '../../queue/queue-producer.service';
+import { UserRegisterProducer } from '../producers/user-register.producer.js';
+import { EVENT_USER_REGISTER } from '../events/user.events.js';
+import type { UserRegisteredEvent } from '../events/user.events.js';
 
 @Injectable()
 export class UserRegisterQueueListener {
   private readonly logger = new Logger(UserRegisterQueueListener.name);
 
-  constructor(private readonly queueProducer: QueueProducerService) {}
+  constructor(private readonly userRegisterProducer: UserRegisterProducer) {}
 
-  @OnEvent('user.register', { async: true })
-  async handleUserRegister(payload: {
-    id: string;
-    email: string;
-    name: string | null;
-  }): Promise<void> {
+  @OnEvent(EVENT_USER_REGISTER, { async: true })
+  async handleUserRegister(payload: UserRegisteredEvent): Promise<void> {
     try {
-      await this.queueProducer.enqueueUserRegister({
-        payload: {
-          userId: payload.id,
-          email: payload.email,
-          name: payload.name || '',
-        },
+      await this.userRegisterProducer.enqueueUserRegister({
+        userId: payload.userId,
       });
     } catch (error) {
       this.logger.error('Failed to enqueue user register job', error);

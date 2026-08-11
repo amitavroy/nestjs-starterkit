@@ -9,6 +9,7 @@ import { LoginResponseDto } from './dto/login-response.dto.js';
 import { RegisterResponseDto } from './dto/register-response.dto.js';
 import { UserResponseDto } from './dto/user-response.dto.js';
 import { UserRepository } from './user.repository.js';
+import { EVENT_USER_REGISTER } from './events/user.events.js';
 
 const SALT_ROUNDS = 10;
 
@@ -48,7 +49,7 @@ export class UserService {
       data: { name, email, password: hashed, emailVerifiedAt: null },
     });
 
-    this.eventEmitter.emit('user.register', user);
+    this.eventEmitter.emit(EVENT_USER_REGISTER, { userId: user.id });
 
     const dto = new RegisterResponseDto();
     dto.id = user.id;

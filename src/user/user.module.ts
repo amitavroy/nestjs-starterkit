@@ -5,6 +5,8 @@ import { UserController } from './user.controller.js';
 import { UserRepository } from './user.repository.js';
 import { UserService } from './user.service.js';
 import { UserRegisterQueueListener } from './listeners/user-register-queue.listener.js';
+import { UserRegisterProducer } from './producers/user-register.producer.js';
+import { UserRegisterProcessor } from './processors/user-register.processor.js';
 
 @Module({
   imports: [
@@ -18,7 +20,13 @@ import { UserRegisterQueueListener } from './listeners/user-register-queue.liste
     }),
   ],
   controllers: [UserController],
-  providers: [UserRepository, UserService, UserRegisterQueueListener],
+  providers: [
+    UserRepository,
+    UserService,
+    UserRegisterQueueListener,
+    UserRegisterProducer,
+    UserRegisterProcessor,
+  ],
   exports: [UserService],
 })
 export class UserModule {}

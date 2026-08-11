@@ -22,6 +22,8 @@ When state change in a service should emit an event after the write succeeds if 
 
 Event names use dot notation and past tense (e.g. `user.registered`, `user.loggedin`).
 
+Event names must be defined once as an exported constant (colocated with the other queue/event constants for that module) and imported by both the emitting service and the `@OnEvent` listener — never a raw string literal on either side. This keeps `emit()` and `@OnEvent(...)` from silently drifting apart on a typo.
+
 ```typescript
 @Injectable()
 export class UserService {
@@ -30,7 +32,7 @@ export class UserService {
   async register(dto: RegisterDto) {
     const user = await this.createUser(dto);
 
-    this.eventEmitter.emit('user.registered', {
+    this.eventEmitter.emit(EVENT_USER_REGISTERED, {
       userId: user.id,
     });
 
@@ -41,13 +43,13 @@ export class UserService {
 
 ### Minimal event payloads
 
-Pass only identifiers and other data the listener needs to decide *what* to do—not full entity snapshots.
+Pass only identifiers and other data the listener needs to decide _what_ to do—not full entity snapshots.
 
-| Do | Don't |
-|----|-------|
-| `{ userId: user.id }` | Pass the entire Prisma model or DTO |
+| Do                             | Don't                                              |
+| ------------------------------ | -------------------------------------------------- |
+| `{ userId: user.id }`          | Pass the entire Prisma model or DTO                |
 | Keep payloads small and stable | Include fields that may change before the job runs |
-| Use typed event interfaces | Use untyped or `any` payloads |
+| Use typed event interfaces     | Use untyped or `any` payloads                      |
 
 Listeners and processors are responsible for loading current data. If a job runs after a delay, the processor queries the repository for the latest row so it always works against data that exists at execution time.
 
@@ -63,7 +65,7 @@ export class UserRegisteredListener {
     @InjectQueue('analytics') private readonly analyticsQueue: Queue,
   ) {}
 
-  @OnEvent('user.registered')
+  @OnEvent(EVENT_USER_REGISTERED)
   async handle(payload: UserRegisteredEvent) {
     await this.emailQueue.add('send-welcome', {
       userId: payload.userId,
@@ -109,7 +111,7 @@ Processors call repositories (never raw queries elsewhere) and external services
 Use `{ async: true }` on `@OnEvent` so the handler runs asynchronously, and **always** catch errors inside the listener so a failed queue add does not fail the user-facing operation:
 
 ```typescript
-@OnEvent('user.registered', { async: true })
+@OnEvent(EVENT_USER_REGISTERED, { async: true })
 async handle(payload: UserRegisteredEvent) {
   try {
     await this.emailQueue.add('send-welcome', { userId: payload.userId });
@@ -124,15 +126,16 @@ Treat event emission as fire-and-forget from the caller’s perspective. The pri
 
 ## Module layout
 
-| Piece | Location | Responsibility |
-|-------|----------|----------------|
-| Event emission | `*.service.ts` | Emit after successful write; minimal payload |
-| Event types | `events/` or next to the module | Typed payloads (e.g. `UserRegisteredEvent`) |
-| Listeners | `*.listener.ts` | `@OnEvent` handlers; enqueue jobs; error handling |
-| Processors | `*.processor.ts` | `@Processor` / `@Process`; load fresh data; side effects |
-| Queues | Module imports `BullModule.registerQueue` | Named queues (`email`, `analytics`, etc.) |
+| Piece          | Location                                                                                                              | Responsibility                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------| ------------------------------------------------------------------------------|
+| Event emission | `*.service.ts`                                                                                                        | Emit after successful write; minimal payload                                 |
+| Event types    | `events/` or next to the module                                                                                       | Typed payloads (e.g. `UserRegisteredEvent`)                                  |
+| Listeners      | `<domain-module>/listeners/*.listener.ts`                                                                             | `@OnEvent` handlers; enqueue jobs; error handling                            |
+| Producers      | `<domain-module>/producers/*.producer.ts`                                                                             | Typed `enqueueXxx` methods; job-specific retry/backoff/dedup options         |
+| Processors     | `<domain-module>/processors/*.processor.ts`                                                                           | `@Processor` / `@Process`; load fresh data; side effects                     |
+| Queues         | Central queue module: `BullModule.forRootAsync`/`registerQueue`, queue name/job constants, shared job payload types   | Generic BullMQ connection & named-queue wiring only — no job-specific options |
 
-Register listeners and processors in the module that owns the domain or in a dedicated integration module, and wire `EventEmitterModule.forRoot()` once in `AppModule`.
+Listeners, producers, and processors are domain logic (they know what a `product.created` job means, what to do with it, and how it should be retried), so they belong in the module that owns that domain — e.g. `src/user/listeners/`, `src/user/producers/`, `src/user/processors/`, `src/product/listeners/`, `src/product/producers/`, `src/product/processors/` — not in the central queue module. Retry counts, backoff strategy, `removeOnComplete`/`removeOnFail`, and dedup keys are per-job decisions the owning domain makes, not generic infrastructure, so the producer that sets them lives with the domain too. The queue module stays infra-only: it wires `BullModule.forRootAsync`/`registerQueue`, and holds the shared queue name/job constants and payload types that producers, listeners, and processors all import — it must not expose a shared `QueueProducerService` with domain-specific enqueue methods. `@Processor` classes don't need to import the central queue module to work — NestJS's BullMQ integration discovers them application-wide, so a processor can live in its domain module as a plain provider. Wire `EventEmitterModule.forRoot()` once in `AppModule`.
 
 ## Checklist for new side effects
 
