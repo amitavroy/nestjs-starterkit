@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { IncomingMessage } from 'node:http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoggerModule, Params } from 'nestjs-pino';
@@ -52,6 +52,16 @@ import { RequestContextService } from '../common/context/request-context.service
             mixin: () => {
               const requestId = requestContextService.getRequestId();
               return requestId ? { requestId } : {};
+            },
+            serializers: {
+              req: (req: IncomingMessage & { id?: string }) => ({
+                id: req.id,
+                method: req.method,
+                url: req.url,
+              }),
+              res: (res: ServerResponse) => ({
+                statusCode: res.statusCode,
+              }),
             },
           },
         };

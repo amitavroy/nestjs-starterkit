@@ -3,6 +3,10 @@ import { z } from 'zod';
 export const validationSchema = z.object({
   APP_ENV: z.enum(['development', 'production', 'test']).default('development'),
   APP_PORT: z.coerce.number().int().positive().default(3000),
+  APP_DEBUG: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   JWT_EXPIRES_IN: z.string().default('8h'),
