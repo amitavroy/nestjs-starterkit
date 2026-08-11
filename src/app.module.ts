@@ -9,10 +9,13 @@ import {
   corsConfig,
   databaseConfig,
   jwtConfig,
+  loggingConfig,
   queueConfig,
   redisConfig,
   validateEnv,
 } from './config/index.js';
+import { RequestContextModule } from './common/context/request-context.module';
+import { LoggingModule } from './logging/logging.module';
 import { CacheModule } from './cache/cache.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queue/queue.module';
@@ -23,9 +26,19 @@ import { UserModule } from './user/user.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-      load: [appConfig, corsConfig, databaseConfig, jwtConfig, redisConfig, queueConfig],
+      load: [
+        appConfig,
+        corsConfig,
+        databaseConfig,
+        jwtConfig,
+        loggingConfig,
+        redisConfig,
+        queueConfig,
+      ],
       validate: validateEnv,
     }),
+    RequestContextModule,
+    LoggingModule,
     EventEmitterModule.forRoot(),
     PrismaModule,
     CacheModule,

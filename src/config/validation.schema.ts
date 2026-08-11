@@ -19,6 +19,17 @@ export const validationSchema = z.object({
     .string()
     .default('http://localhost:5173,http://localhost:3000')
     .transform((value) => value.split(',').map((origin) => origin.trim())),
+  LOG_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
+    .default('info'),
+  LOG_TO_FILE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  LOG_FILE_PATH: z.string().default('./logs'),
+  LOG_FILE_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
+    .optional(),
 });
 
 export type EnvConfig = z.infer<typeof validationSchema>;

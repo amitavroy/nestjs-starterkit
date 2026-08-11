@@ -6,15 +6,25 @@ import { createBullBoard } from '@bull-board/api';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { Queue } from 'bullmq';
+import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cors from 'cors';
 import { AppModule } from './app.module';
+import { createRequestContextMiddleware } from './common/context/request-context.middleware';
+import { RequestContextService } from './common/context/request-context.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+
+  app.use(createRequestContextMiddleware(app.get(RequestContextService)));
+  app.useLogger(app.get(Logger));
+
   const configService = app.get(ConfigService);
 
-  const isProduction = configService.getOrThrow<string>('app.env') === 'production';
+  const isProduction =
+    configService.getOrThrow<string>('app.env') === 'production';
 
   app.use(
     helmet({
@@ -52,7 +62,9 @@ async function bootstrap() {
     SwaggerModule.setup('docs', app, document);
   }
 
-  const enableBullBoard = configService.getOrThrow<boolean>('queue.enableBullBoard');
+  const enableBullBoard = configService.getOrThrow<boolean>(
+    'queue.enableBullBoard',
+  );
 
   if (!isProduction || enableBullBoard) {
     const bullMQAdapter = new ExpressAdapter().setBasePath('/admin/queues');
